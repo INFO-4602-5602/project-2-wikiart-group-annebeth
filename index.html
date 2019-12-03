@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- <title>Technically savvy, but a little wary</title> -->
+
+<style>
+
+h1, h2, h3 {
+  padding-left: 20px;
+}
+
+.node {
+  cursor: pointer;
+}
+.node:hover {
+  stroke: white;
+  stroke-width: 1.5px;
+}
+.node--leaf {
+  fill: white;
+}
+.label {
+  font: 11px "Helvetica Neue", Helvetica, Arial, sans-serif, white;
+  /* font-color: white; */
+  text-anchor: middle;
+}
+.label {
+  fill: black;
+}
+.node--root {
+  fill: white;
+}
+.node--leaf {
+  /* pointer-events: none; */
+}
+
+</style>
+<body>
+  <!--Import the D3 Library (version 4 in this case)-->
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <script src="//d3js.org/d3-scale-chromatic.v0.3.min.js"></script>
+
+  <h1><em>Renaissance and Post-Renaissance Paintings</em></h1>
+  <h2>Something about the visualization.</h2>
+  <div id="visualization_1"></div>
+  <div id="visualization_2">
+    <svg width="960" height="960"></svg>
+  </div>
+
+<script>
+
+  // VISUALIZATION 1: STACKED AREA CHART
+  // Inspiration from: https://www.d3-graph-gallery.com/graph/stackedarea_template.html
+
+  // Set up the bounds of the visualization
+  var margin = { top: 40, right: 400, bottom: 60, left: 60 };
+  var width = 1200 - margin.right - margin.left;
+  var height = 550 - margin.top - margin.bottom;
+
+  // Set up the first SVG that gives us a canvas to draw on
+  var svg_stacked = d3.select("#visualization_1").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  d3.csv("data/categories_per_year_renaissance.csv", function(data) {
+    // var keys = data.columns.slice(1)
+
+    // Instead of grabbing the keys from the data, I add them in the correct
+    // historical order.
+    var keys = [
+      "Early Renaissance",
+      "High Renaissance",
+      "Northern Renaissance",
+      "Baroque",
+      "Rococo",
+      "Neoclassicism",
+      "Romanticism",
+      "Realism"
+    ]
+
+    // color palette
+    var color = d3.scaleOrdinal()
+      .domain(keys)
+      .range(d3.schemePaired);
+
+    // stack the data
+    var stackedData = d3.stack()
+      .keys(keys)
+      (data)
+
+    // Add X axis
+    var x = d3.scaleLinear()
+      .domain(d3.extent(data, function(d) { return d.year; }))
+      .range([ 0, width ]);
+    var xAxis = svg_stacked.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      // .style("text-anchor", "end")
+      .style("font-size", 15);
+
+      // Add X axis label:
+    svg_stacked.append("text")
+        .attr("text-anchor", "end")
+        .attr("x", width)
+        .attr("y", height+40 )
+        .text("Time (year)");
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+      // TODO: Make this not fixed.
+      .domain([0, 10])
+      .range([ height, 0 ]);
+    svg_stacked.append("g")
+      .call(d3.axisLeft(y).tickValues([]));
+
+    svg_stacked.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", 0)
+      .attr("y", -20 )
+      .text("Number of paintings")
+      .attr("text-anchor", "start")
+
+    var areaChart = svg_stacked.append('g')
+
+    // Area generator
+    var area = d3.area()
+      .curve(d3.curveBasis)
+      .x(function(d) { return x(d.data.year); })
+      .y0(function(d) { return y(d[0]); })
+      .y1(function(d) { return y(d[1]); })
+
+    // Show the areas
+    areaChart
+      .selectAll("mylayers")
+      .data(stackedData)
+      .enter()
+      .append("path")
+        .attr("class", function(d) { return "myArea " + createClassName(d.key) })
+        .style("fill", function(d) { return color(d.key); })
+        .attr("d", area)
+
+    // Select specific groups by hovering
+    var highlight = function(d){
+      // reduce opacity of all groups
+      d3.selectAll(".myArea").style("opacity", .1)
+      // expect the one that is hovered
+      d3.select("." + createClassName(d)).style("opacity", 1)
+    }
+    // And when it is not hovered anymore
+    var noHighlight = function(d){
+      d3.selectAll(".myArea").style("opacity", 1)
+    }
+
+    // Add one dot in the legend for each name.
+    var size = 20
+    svg_stacked.selectAll("myrect")
+      .data(keys)
+      .enter()
+      .append("rect")
+        .attr("x", 775)
+        .attr("y", function(d,i){ return 20 + i*(size+5)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .attr("width", size)
+        .attr("height", size)
+        .style("fill", function(d){ return color(d)})
+        .on("mouseover", highlight)
+        .on("mouseleave", noHighlight)
+
+    // Add one dot in the legend for each name.
+    svg_stacked.selectAll("mylabels")
+      .data(keys)
+      .enter()
+      .append("text")
+        .attr("x", 775 + size*1.2)
+        .attr("y", function(d,i){ return 20 + i*(size+5) + (size/2)}) // 100 is where the first dot appears. 25 is the distance between dots
+        .style("fill", function(d){ return color(d)})
+        .text(function(d){ return d})
+        .attr("text-anchor", "left")
+        .style("alignment-baseline", "middle")
+        .on("mouseover", highlight)
+        .on("mouseleave", noHighlight)
+
+  })
+
+  // VISUALIZATION 2:
+  // Zoomable circular packing
+  var svg = d3.select("#visualization_2 svg"),
+      defs = svg.append("defs")
+      margin = 20,
+      diameter = +svg.attr("width"),
+      g = svg.append("g").attr("transform", "translate(" + diameter / 2 + "," + diameter / 2 + ")");
+
+  var tooltip = d3.select("#visualization_2")
+  	.append("div")
+  	.style("position", "absolute")
+  	.style("z-index", "10")
+  	.style("visibility", "hidden")
+    .style("background-color", "white")
+    .style("border", "solid")
+    .style("border-width", "1px")
+    .style("border-radius", "5px")
+    .style("padding", "5px")
+    .style("position", "absolute")
+
+  // Use the same color scale as in the first visualization
+  var keys = [
+    "Early Renaissance",
+    "High Renaissance",
+    "Northern Renaissance",
+    "Baroque",
+    "Rococo",
+    "Neoclassicism",
+    "Romanticism",
+    "Realism"
+  ]
+
+  // color palette
+  var category_color = d3.scaleOrdinal()
+    .domain(keys)
+    .range(d3.schemePaired);
+
+  var pack = d3.pack()
+      .size([diameter - margin, diameter - margin])
+      .padding(3);
+
+  d3.json("data/category_artist_data.json", function(error, root) {
+    if (error) throw error;
+
+    root = d3.hierarchy(root)
+        .sum(function(d) { return d.size; })
+        .sort(function(a, b) { return b.value - a.value; });
+
+    var focus = root,
+        nodes = pack(root).descendants(),
+        view;
+
+    var circle = g.selectAll("circle")
+      .data(nodes)
+      .enter().append("circle")
+        .attr("class", function(d) { return d.parent ? d.children ? "node" : "node node--leaf" : "node node--root"; })
+        .style("fill", function(d) { return d.depth == 1 ? category_color(d.data.name) : null; })
+        .on("click", function(d) { if (focus !== d) zoom(d), d3.event.stopPropagation(); }) //;
+        .on("mouseover", function(d){return tooltip.html(createTooltipText(d)).style("visibility", "visible");})
+        // .on("mouseover", function(d){return tooltip.text(d.data.name).style("visibility", "visible");})
+      	.on("mousemove", function(){return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");})
+      	.on("mouseout", function(){return tooltip.style("visibility", "hidden");});
+
+    var text = g.selectAll("text")
+      .data(nodes)
+      .enter().append("text")
+        .attr("class", "label")
+        .style("fill-opacity", function(d) { return d.parent === root ? 1 : 0; })
+        .style("display", "none")//function(d) { return d.parent === root ? "inline" : "none"; })
+        .text(function(d) { return d.data.name; });
+
+    var node = g.selectAll("circle, text");
+
+    svg.on("click", function() { zoom(root); });
+
+    zoomTo([root.x, root.y, root.r * 2 + margin]);
+
+    function zoom(d) {
+      var focus0 = focus; focus = d;
+
+      var transition = d3.transition()
+          .duration(d3.event.altKey ? 7500 : 1200)
+          .tween("zoom", function(d) {
+            var i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2 + margin]);
+            return function(t) { zoomTo(i(t)); };
+          });
+
+      // transition.selectAll("text")
+      //   .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+      //     .style("fill-opacity", function(d) { return d.parent === focus ? 1 : 0; })
+      //     .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+      //     .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+    }
+
+    function zoomTo(v) {
+      var k = diameter / v[2]; view = v;
+      node.attr("transform", function(d) { return "translate(" + (d.x - v[0]) * k + "," + (d.y - v[1]) * k + ")"; });
+      circle.attr("r", function(d) { return d.r * k; });
+    }
+  });
+
+// Function for creating stacked area class names
+function createClassName(key) {
+  return key.replace(/ /g, "_").toLowerCase();
+}
+
+// Function for creating circle chart tooltip texts
+function createTooltipText(d) {
+  // If at the painting level, return title / year / artist.
+  if (d.data.type == "artist") {
+    var category = d.parent.data.name
+    return "<b> Artist: " + d.data.name + "</b>" + "</br>" + category
+    // console.log(category);
+  } else if (d.data.year) {
+    var artist = d.parent.data.name
+    var category = d.parent.parent.data.name
+    return "<b> Painting: " + d.data.name + "</b>" + "</br>" + d.data.year + "</br>" + artist + "</br>" + category
+  } else {
+    // If a first/level category, return just the category name
+    return d.data.name;
+  }
+}
+
+</script>
